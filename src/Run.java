@@ -29,10 +29,62 @@ public class Run {
         System.out.println("\t\t 3 SimplePlayer");
         System.out.println("\t\t 4 RHEA 200 itereations, shift buffer, pop size 1, random init, length: 12");
         System.out.println("\t\t 5 MCTS 200 iterations, length: 12");
-        System.out.println("\t\t 6 SafetyMCTS assignment agent");
+        System.out.println(
+                "\t\t 6 Full SafetyMCTS"
+        );
+        System.out.println(
+                "\t\t 7 SafetyMCTS baseline copy"
+        );
+        System.out.println(
+                "\t\t 8 SafetyMCTS safe rollouts only"
+        );
+        System.out.println(
+                "\t\t 9 SafetyMCTS safe expansion only"
+        );
+        System.out.println(
+                "\t\t 10 SafetyMCTS rollout and expansion"
+        );
+        System.out.println(
+                "\t\t 11 SafetyMCTS escape-aware"
+        );
+        System.out.println(
+                "\t\t 12 SafetyMCTS safety heuristic only"
+        );
     }
 
-    public static void main(String[] args) {
+    /**
+     * Creates a SafetyMCTS parameter configuration for experiments.
+     *
+     * All configurations use the same search budget as baseline MCTS.
+     */
+    private static SafetyMCTSParams createSafetyParams(
+            boolean safeRollouts,
+            boolean safeExpansion,
+            boolean escapeCheck,
+            boolean safetyHeuristic
+    ) {
+        SafetyMCTSParams params = new SafetyMCTSParams();
+
+        params.stop_type = params.STOP_ITERATIONS;
+        params.num_iterations = 200;
+        params.rollout_depth = 12;
+
+        params.use_safe_rollouts = safeRollouts;
+        params.use_safe_expansion = safeExpansion;
+        params.use_escape_check = escapeCheck;
+
+        if (safetyHeuristic) {
+            params.heuristic_method =
+                    params.SAFETY_HEURISTIC;
+        } else {
+            params.heuristic_method =
+                    params.CUSTOM_HEURISTIC;
+        }
+
+        return params;
+    }
+
+    static void main(String[] args) {
 
         //default
         if(args.length == 0)
@@ -60,7 +112,7 @@ public class Run {
             int N = Integer.parseInt(args[2]);
             Types.DEFAULT_VISION_RANGE = Integer.parseInt(args[3]);
 
-            long seeds[];
+            long[] seeds;
 
             if (S == -1)
             {
@@ -126,19 +178,131 @@ public class Run {
                         playerStr[i-4] = "MCTS";
                         break;
                     case 6:
-                        SafetyMCTSParams safetyParams = new SafetyMCTSParams();
-                        safetyParams.stop_type = safetyParams.STOP_ITERATIONS;
-                        safetyParams.num_iterations = 200;
-                        safetyParams.rollout_depth = 12;
-                        safetyParams.heuristic_method = safetyParams.SAFETY_HEURISTIC;
+                        SafetyMCTSParams fullParams =
+                                createSafetyParams(
+                                        true,
+                                        true,
+                                        true,
+                                        true
+                                );
 
                         p = new SafetyMCTSPlayer(
                                 seed,
                                 playerID++,
-                                safetyParams
+                                fullParams
                         );
 
-                        playerStr[i - 4] = "SafetyMCTS";
+                        playerStr[i - 4] = "SafetyMCTS-Full";
+                        break;
+                    case 7:
+                        SafetyMCTSParams baselineParams =
+                                createSafetyParams(
+                                        false,
+                                        false,
+                                        false,
+                                        false
+                                );
+
+                        p = new SafetyMCTSPlayer(
+                                seed,
+                                playerID++,
+                                baselineParams
+                        );
+
+                        playerStr[i - 4] = "SafetyMCTS-Baseline";
+                        break;
+
+                    case 8:
+                        SafetyMCTSParams rolloutParams =
+                                createSafetyParams(
+                                        true,
+                                        false,
+                                        false,
+                                        false
+                                );
+
+                        p = new SafetyMCTSPlayer(
+                                seed,
+                                playerID++,
+                                rolloutParams
+                        );
+
+                        playerStr[i - 4] = "SafetyMCTS-Rollout";
+                        break;
+
+                    case 9:
+                        SafetyMCTSParams expansionParams =
+                                createSafetyParams(
+                                        false,
+                                        true,
+                                        false,
+                                        false
+                                );
+
+                        p = new SafetyMCTSPlayer(
+                                seed,
+                                playerID++,
+                                expansionParams
+                        );
+
+                        playerStr[i - 4] = "SafetyMCTS-Expansion";
+                        break;
+
+                    case 10:
+                        SafetyMCTSParams rolloutExpansionParams =
+                                createSafetyParams(
+                                        true,
+                                        true,
+                                        false,
+                                        false
+                                );
+
+                        p = new SafetyMCTSPlayer(
+                                seed,
+                                playerID++,
+                                rolloutExpansionParams
+                        );
+
+                        playerStr[i - 4] =
+                                "SafetyMCTS-RolloutExpansion";
+                        break;
+
+                    case 11:
+                        SafetyMCTSParams escapeParams =
+                                createSafetyParams(
+                                        true,
+                                        true,
+                                        true,
+                                        false
+                                );
+
+                        p = new SafetyMCTSPlayer(
+                                seed,
+                                playerID++,
+                                escapeParams
+                        );
+
+                        playerStr[i - 4] =
+                                "SafetyMCTS-Escape";
+                        break;
+
+                    case 12:
+                        SafetyMCTSParams heuristicParams =
+                                createSafetyParams(
+                                        false,
+                                        false,
+                                        false,
+                                        true
+                                );
+
+                        p = new SafetyMCTSPlayer(
+                                seed,
+                                playerID++,
+                                heuristicParams
+                        );
+
+                        playerStr[i - 4] =
+                                "SafetyMCTS-Heuristic";
                         break;
                     default:
                         System.out.println("WARNING: Invalid agent ID: " + agentType );
@@ -198,7 +362,7 @@ public class Run {
         g.run(frame, wi, separateThreads);
     }
 
-    public static void runGames(Game g, long seeds[], int repetitions, boolean useSeparateThreads){
+    public static void runGames(Game g, long[] seeds, int repetitions, boolean useSeparateThreads){
         int numPlayers = g.getPlayers().size();
         int[] winCount = new int[numPlayers];
         int[] tieCount = new int[numPlayers];
@@ -213,7 +377,7 @@ public class Run {
             long seed = seeds[s];
 
             for (int i = 0; i < repetitions; i++) {
-                long playerSeed = System.currentTimeMillis();
+                long playerSeed = seed * 1_000_003L + i;
 
                 System.out.print( playerSeed + ", " + seed + ", " + (s*repetitions + i) + "/" + totalNgames + ", ");
 
