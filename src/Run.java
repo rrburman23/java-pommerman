@@ -130,7 +130,7 @@ public class Run {
                         safetyParams.stop_type = safetyParams.STOP_ITERATIONS;
                         safetyParams.num_iterations = 200;
                         safetyParams.rollout_depth = 12;
-                        safetyParams.heuristic_method = safetyParams.CUSTOM_HEURISTIC;
+                        safetyParams.heuristic_method = safetyParams.SAFETY_HEURISTIC;
 
                         p = new SafetyMCTSPlayer(
                                 seed,

@@ -4,6 +4,7 @@ import core.GameState;
 import players.heuristics.AdvancedHeuristic;
 import players.heuristics.CustomHeuristic;
 import players.heuristics.StateHeuristic;
+import players.safetymcts.SafetyHeuristic;
 import utils.ElapsedCpuTimer;
 import utils.Types;
 import utils.Utils;
@@ -58,10 +59,28 @@ public class SafetyTreeNode
     void setRootGameState(GameState gs)
     {
         this.rootState = gs;
-        if (params.heuristic_method == params.CUSTOM_HEURISTIC)
-            this.rootStateHeuristic = new CustomHeuristic(gs);
-        else if (params.heuristic_method == params.ADVANCED_HEURISTIC) // New method: combined heuristics
-            this.rootStateHeuristic = new AdvancedHeuristic(gs, m_rnd);
+
+        if (params.heuristic_method
+                == params.CUSTOM_HEURISTIC) {
+            this.rootStateHeuristic =
+                    new CustomHeuristic(gs);
+        }
+        else if (params.heuristic_method
+                == params.ADVANCED_HEURISTIC) {
+            this.rootStateHeuristic =
+                    new AdvancedHeuristic(gs, m_rnd);
+        }
+        else if (params.heuristic_method
+                == params.SAFETY_HEURISTIC) {
+            this.rootStateHeuristic =
+                    new SafetyHeuristic(gs, params);
+        }
+        else {
+            throw new IllegalArgumentException(
+                    "Unknown heuristic method: "
+                            + params.heuristic_method
+            );
+        }
     }
 
 
