@@ -37,6 +37,12 @@ public class SafetyMCTSParams implements ParameterSet {
     // Enables danger-aware action selection during MCTS rollouts.
     public boolean use_safe_rollouts = true;
 
+    /**
+     * Enables danger-aware filtering when expanding the MCTS tree.
+     *
+     * When disabled, expansion behaves like the original MCTS agent.
+     */
+    public boolean use_safe_expansion = true;
 
     // A tile is treated as urgent danger when it will be hit within this number of game ticks.
     public int danger_horizon = 2;

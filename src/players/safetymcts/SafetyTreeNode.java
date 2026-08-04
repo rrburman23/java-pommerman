@@ -120,26 +120,111 @@ public class SafetyTreeNode
     }
 
 
-    private SafetyTreeNode expand(GameState state) {
+    /**
+     * Expands one previously unvisited action.
+     *
+     * When safe expansion is enabled, unvisited actions with an immediately
+     * safe destination are preferred. If none appear safe, expansion falls
+     * back to any unvisited action so the tree search can continue.
+     */
+    private SafetyTreeNode expand(GameState state)
+    {
+        int selectedAction = selectExpansionAction(state);
 
-        int bestAction = 0;
-        double bestValue = -1;
+        roll(state, actions[selectedAction]);
 
-        for (int i = 0; i < children.length; i++) {
-            double x = m_rnd.nextDouble();
-            if (x > bestValue && children[i] == null) {
-                bestAction = i;
-                bestValue = x;
+        SafetyTreeNode child = new SafetyTreeNode(
+                params,
+                this,
+                selectedAction,
+                this.m_rnd,
+                num_actions,
+                actions,
+                fmCallsCount,
+                rootStateHeuristic
+        );
+
+        children[selectedAction] = child;
+
+        return child;
+    }
+
+    /**
+     * Selects an unexpanded action for a new tree node.
+     */
+    private int selectExpansionAction(GameState state)
+    {
+        ArrayList<Integer> allUnexpandedActions =
+                new ArrayList<>();
+
+        ArrayList<Integer> safeUnexpandedActions =
+                new ArrayList<>();
+
+        Vector2d currentPosition = state.getPosition();
+        DangerMap dangerMap = null;
+
+        if (params.use_safe_expansion
+                && currentPosition != null) {
+            dangerMap = new DangerMap(state);
+        }
+
+        for (int actionIndex = 0;
+             actionIndex < children.length;
+             actionIndex++)
+        {
+            if (children[actionIndex] != null) {
+                continue;
+            }
+
+            allUnexpandedActions.add(actionIndex);
+
+            if (params.use_safe_expansion
+                    && currentPosition != null
+                    && isSafeDestination(
+                    state,
+                    dangerMap,
+                    currentPosition,
+                    actions[actionIndex]
+            )) {
+                safeUnexpandedActions.add(actionIndex);
             }
         }
 
-        //Roll the state
-        roll(state, actions[bestAction]);
+        if (!safeUnexpandedActions.isEmpty()) {
+            return chooseRandomIndex(
+                    safeUnexpandedActions
+            );
+        }
 
-        SafetyTreeNode tn = new SafetyTreeNode(params,this,bestAction,this.m_rnd,num_actions,
-                actions, fmCallsCount, rootStateHeuristic);
-        children[bestAction] = tn;
-        return tn;
+        if (!allUnexpandedActions.isEmpty()) {
+            return chooseRandomIndex(
+                    allUnexpandedActions
+            );
+        }
+
+        throw new IllegalStateException(
+                "expand() called on a fully expanded node."
+        );
+    }
+
+    /**
+     * Randomly selects one action index from a non-empty list.
+     */
+    private int chooseRandomIndex(
+            ArrayList<Integer> actionIndexes
+    )
+    {
+        if (actionIndexes == null
+                || actionIndexes.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Action index list cannot be empty."
+            );
+        }
+
+        int randomListIndex =
+                m_rnd.nextInt(actionIndexes.size());
+
+        return actionIndexes.get(randomListIndex);
     }
 
     private void roll(GameState gs, Types.ACTIONS act)
@@ -363,10 +448,7 @@ public class SafetyTreeNode
             return m_rnd.nextInt(num_actions);
         }
 
-        int selectedSafeIndex =
-                m_rnd.nextInt(safeActionIndexes.size());
-
-        return safeActionIndexes.get(selectedSafeIndex);
+        return chooseRandomIndex(safeActionIndexes);
     }
 
     /**
