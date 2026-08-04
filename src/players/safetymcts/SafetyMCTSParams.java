@@ -20,6 +20,13 @@ public class SafetyMCTSParams implements ParameterSet {
 
     public final int CUSTOM_HEURISTIC = 0;
     public final int ADVANCED_HEURISTIC = 1;
+    public final int SAFETY_HEURISTIC = 2;
+
+    // Weight applied to the SafetyMCTS danger penalty.
+    public double danger_weight = 0.25;
+
+    // Weight applied to local safe mobility.
+    public double mobility_weight = 0.10;
 
     public double epsilon = 1e-6;
 
@@ -85,7 +92,7 @@ public class SafetyMCTSParams implements ParameterSet {
         HashMap<String, Object[]> parameterValues = new HashMap<>();
         parameterValues.put("K", new Double[]{1.0, Math.sqrt(2), 2.0});
         parameterValues.put("rollout_depth", new Integer[]{5, 8, 10, 12, 15});
-        parameterValues.put("heuristic_method", new Integer[]{CUSTOM_HEURISTIC, ADVANCED_HEURISTIC});
+        parameterValues.put("heuristic_method", new Integer[]{CUSTOM_HEURISTIC, ADVANCED_HEURISTIC, SAFETY_HEURISTIC});
         return parameterValues;
     }
 
@@ -102,7 +109,7 @@ public class SafetyMCTSParams implements ParameterSet {
     @Override
     public Map<String, String[]> constantNames() {
         HashMap<String, String[]> names = new HashMap<>();
-        names.put("heuristic_method", new String[]{"CUSTOM_HEURISTIC", "ADVANCED_HEURISTIC"});
+        names.put("heuristic_method", new String[]{"CUSTOM_HEURISTIC", "ADVANCED_HEURISTIC","SAFETY_HEURISTIC"});
         return names;
     }
 }
