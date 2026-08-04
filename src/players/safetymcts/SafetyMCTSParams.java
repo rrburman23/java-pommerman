@@ -34,6 +34,13 @@ public class SafetyMCTSParams implements ParameterSet {
     public int num_fmcalls = 2000;
     public int num_time = 40;
 
+    // Enables danger-aware action selection during MCTS rollouts.
+    public boolean use_safe_rollouts = true;
+
+
+    // A tile is treated as urgent danger when it will be hit within this number of game ticks.
+    public int danger_horizon = 2;
+
     @Override
     public void setParameterValue(String param, Object value) {
         switch(param) {

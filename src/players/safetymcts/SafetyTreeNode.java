@@ -201,8 +201,8 @@ public class SafetyTreeNode
     {
         int thisDepth = this.m_depth;
 
-        while (!finishRollout(state,thisDepth)) {
-            int action = safeRandomAction(state);
+        while (!finishRollout(state, thisDepth)) {
+            int action = selectRolloutAction(state);
             roll(state, actions[action]);
             thisDepth++;
         }
@@ -210,33 +210,7 @@ public class SafetyTreeNode
         return rootStateHeuristic.evaluateState(state);
     }
 
-    private int safeRandomAction(GameState state)
-    {
-        Types.TILETYPE[][] board = state.getBoard();
-        ArrayList<Types.ACTIONS> actionsToTry = Types.ACTIONS.all();
-        int width = board.length;
-        int height = board[0].length;
 
-        while(actionsToTry.size() > 0) {
-
-            int nAction = m_rnd.nextInt(actionsToTry.size());
-            Types.ACTIONS act = actionsToTry.get(nAction);
-            Vector2d dir = act.getDirection().toVec();
-
-            Vector2d pos = state.getPosition();
-            int x = pos.x + dir.x;
-            int y = pos.y + dir.y;
-
-            if (x >= 0 && x < width && y >= 0 && y < height)
-                if(board[y][x] != Types.TILETYPE.FLAMES)
-                    return nAction;
-
-            actionsToTry.remove(nAction);
-        }
-
-        //Uh oh...
-        return m_rnd.nextInt(num_actions);
-    }
 
     @SuppressWarnings("RedundantIfStatement")
     private boolean finishRollout(GameState rollerState, int depth)
@@ -341,5 +315,103 @@ public class SafetyTreeNode
         }
 
         return false;
+    }
+
+    /**
+     * Selects an action during an MCTS rollout.
+     *
+     * When danger-aware rollouts are enabled, the method chooses randomly
+     * between actions whose immediate destination is not blocked, burning,
+     * or threatened by a bomb within the configured danger horizon.
+     */
+    private int selectRolloutAction(GameState state)
+    {
+        if (!params.use_safe_rollouts) {
+            return m_rnd.nextInt(num_actions);
+        }
+
+        Vector2d currentPosition = state.getPosition();
+
+        if (currentPosition == null) {
+            return m_rnd.nextInt(num_actions);
+        }
+
+        DangerMap dangerMap = new DangerMap(state);
+        ArrayList<Integer> safeActionIndexes = new ArrayList<>();
+
+        for (int actionIndex = 0;
+             actionIndex < num_actions;
+             actionIndex++)
+        {
+            Types.ACTIONS action = actions[actionIndex];
+
+            if (isSafeDestination(
+                    state,
+                    dangerMap,
+                    currentPosition,
+                    action
+            )) {
+                safeActionIndexes.add(actionIndex);
+            }
+        }
+
+        /*
+         * When every action appears dangerous, retain exploration by
+         * returning a random action instead of stopping the rollout.
+         */
+        if (safeActionIndexes.isEmpty()) {
+            return m_rnd.nextInt(num_actions);
+        }
+
+        int selectedSafeIndex =
+                m_rnd.nextInt(safeActionIndexes.size());
+
+        return safeActionIndexes.get(selectedSafeIndex);
+    }
+
+    /**
+     * Checks the immediate destination produced by an action.
+     *
+     * This is a lightweight safety filter rather than a complete survival
+     * proof. Longer-term escape-route analysis will be added separately.
+     */
+    private boolean isSafeDestination(
+            GameState state,
+            DangerMap dangerMap,
+            Vector2d currentPosition,
+            Types.ACTIONS action
+    )
+    {
+        Vector2d direction = action.getDirection().toVec();
+
+        int destinationX =
+                currentPosition.x + direction.x;
+
+        int destinationY =
+                currentPosition.y + direction.y;
+
+        if (!dangerMap.isInsideBoard(
+                destinationX,
+                destinationY
+        )) {
+            return false;
+        }
+
+        Types.TILETYPE[][] board = state.getBoard();
+        Types.TILETYPE destinationTile =
+                board[destinationY][destinationX];
+
+        if (destinationTile == Types.TILETYPE.RIGID
+                || destinationTile == Types.TILETYPE.WOOD
+                || destinationTile == Types.TILETYPE.BOMB
+                || destinationTile == Types.TILETYPE.FLAMES) {
+            return false;
+        }
+
+        return !dangerMap.isDangerousWithin(
+                destinationX,
+                destinationY,
+                params.danger_horizon
+        );
     }
 }
