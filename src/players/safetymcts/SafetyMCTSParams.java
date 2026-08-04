@@ -47,6 +47,11 @@ public class SafetyMCTSParams implements ParameterSet {
     // A tile is treated as urgent danger when it will be hit within this number of game ticks.
     public int danger_horizon = 2;
 
+    /**
+     * Rejects bomb placement when no escape route can be found.
+     */
+    public boolean use_escape_check = true;
+
     @Override
     public void setParameterValue(String param, Object value) {
         switch(param) {

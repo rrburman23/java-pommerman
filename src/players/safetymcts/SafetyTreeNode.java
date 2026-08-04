@@ -464,6 +464,27 @@ public class SafetyTreeNode
             Types.ACTIONS action
     )
     {
+        if (action == Types.ACTIONS.ACTION_BOMB) {
+            if (state.getAmmo() <= 0) {
+                return false;
+            }
+
+            if (params.use_escape_check
+                    && !EscapeRouteChecker.hasEscapeRoute(state)) {
+                return false;
+            }
+
+            /*
+             * Placing a bomb does not move the agent immediately, so also
+             * ensure the current cell is not already in urgent danger.
+             */
+            return !dangerMap.isDangerousWithin(
+                    currentPosition.x,
+                    currentPosition.y,
+                    params.danger_horizon
+            );
+        }
+
         Vector2d direction = action.getDirection().toVec();
 
         int destinationX =
