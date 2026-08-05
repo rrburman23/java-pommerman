@@ -54,13 +54,10 @@ public final class SafetyMCTSExperiment {
             new LinkedHashMap<>();
 
     static {
-        VARIANTS.put(6, "full");
         VARIANTS.put(7, "baseline_copy");
         VARIANTS.put(8, "safe_rollout");
-        VARIANTS.put(9, "safe_expansion");
-        VARIANTS.put(10, "rollout_expansion");
         VARIANTS.put(11, "escape_aware");
-        VARIANTS.put(12, "safety_heuristic");
+        VARIANTS.put(6, "full");
     }
 
     private SafetyMCTSExperiment() {
