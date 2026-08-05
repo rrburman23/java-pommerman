@@ -4,7 +4,6 @@ import core.GameState;
 import players.heuristics.AdvancedHeuristic;
 import players.heuristics.CustomHeuristic;
 import players.heuristics.StateHeuristic;
-import players.safetymcts.SafetyHeuristic;
 import utils.ElapsedCpuTimer;
 import utils.Types;
 import utils.Utils;
@@ -13,17 +12,24 @@ import utils.Vector2d;
 import java.util.ArrayList;
 import java.util.Random;
 
-public class SafetyTreeNode
-{
+public class SafetyTreeNode {
+
     public SafetyMCTSParams params;
 
     private SafetyTreeNode parent;
     private SafetyTreeNode[] children;
+
     private double totValue;
     private int nVisits;
+
     private Random m_rnd;
     private int m_depth;
-    private double[] bounds = new double[]{Double.MAX_VALUE, -Double.MAX_VALUE};
+
+    private double[] bounds = new double[]{
+            Double.MAX_VALUE,
+            -Double.MAX_VALUE
+    };
+
     private int childIdx;
     private int fmCallsCount;
 
@@ -33,49 +39,76 @@ public class SafetyTreeNode
     private GameState rootState;
     private StateHeuristic rootStateHeuristic;
 
-    SafetyTreeNode(SafetyMCTSParams p, Random rnd, int num_actions, Types.ACTIONS[] actions) {
-        this(p, null, -1, rnd, num_actions, actions, 0, null);
+    SafetyTreeNode(
+            SafetyMCTSParams p,
+            Random rnd,
+            int num_actions,
+            Types.ACTIONS[] actions
+    ) {
+        this(
+                p,
+                null,
+                -1,
+                rnd,
+                num_actions,
+                actions,
+                0,
+                null
+        );
     }
 
-    private SafetyTreeNode(SafetyMCTSParams p, SafetyTreeNode parent, int childIdx, Random rnd, int num_actions,
-                           Types.ACTIONS[] actions, int fmCallsCount, StateHeuristic sh) {
+    private SafetyTreeNode(
+            SafetyMCTSParams p,
+            SafetyTreeNode parent,
+            int childIdx,
+            Random rnd,
+            int num_actions,
+            Types.ACTIONS[] actions,
+            int fmCallsCount,
+            StateHeuristic sh
+    ) {
         this.params = p;
         this.fmCallsCount = fmCallsCount;
         this.parent = parent;
         this.m_rnd = rnd;
         this.num_actions = num_actions;
         this.actions = actions;
+
         children = new SafetyTreeNode[num_actions];
         totValue = 0.0;
+
         this.childIdx = childIdx;
-        if(parent != null) {
+
+        if (parent != null) {
             m_depth = parent.m_depth + 1;
             this.rootStateHeuristic = sh;
-        }
-        else
+        } else {
             m_depth = 0;
+        }
     }
 
-    void setRootGameState(GameState gs)
-    {
+    void setRootGameState(GameState gs) {
         this.rootState = gs;
 
         if (params.heuristic_method
                 == params.CUSTOM_HEURISTIC) {
+
             this.rootStateHeuristic =
                     new CustomHeuristic(gs);
-        }
-        else if (params.heuristic_method
+
+        } else if (params.heuristic_method
                 == params.ADVANCED_HEURISTIC) {
+
             this.rootStateHeuristic =
                     new AdvancedHeuristic(gs, m_rnd);
-        }
-        else if (params.heuristic_method
+
+        } else if (params.heuristic_method
                 == params.SAFETY_HEURISTIC) {
+
             this.rootStateHeuristic =
                     new SafetyHeuristic(gs, params);
-        }
-        else {
+
+        } else {
             throw new IllegalArgumentException(
                     "Unknown heuristic method: "
                             + params.heuristic_method
@@ -83,85 +116,120 @@ public class SafetyTreeNode
         }
     }
 
-
     void mctsSearch(ElapsedCpuTimer elapsedTimer) {
+        double averageTimeTaken;
+        double accumulatedTimeTaken = 0.0;
 
-        double avgTimeTaken;
-        double acumTimeTaken = 0;
         long remaining;
-        int numIters = 0;
+        int numberOfIterations = 0;
 
         int remainingLimit = 5;
         boolean stop = false;
 
-        while(!stop){
-
+        while (!stop) {
             GameState state = rootState.copy();
-            ElapsedCpuTimer elapsedTimerIteration = new ElapsedCpuTimer();
-            SafetyTreeNode selected = treePolicy(state);
-            double delta = selected.rollOut(state);
-            backUp(selected, delta);
 
-            //Stopping condition
-            if(params.stop_type == params.STOP_TIME) {
-                numIters++;
-                acumTimeTaken += (elapsedTimerIteration.elapsedMillis()) ;
-                avgTimeTaken  = acumTimeTaken/numIters;
-                remaining = elapsedTimer.remainingTimeMillis();
-                stop = remaining <= 2 * avgTimeTaken || remaining <= remainingLimit;
-            }else if(params.stop_type == params.STOP_ITERATIONS) {
-                numIters++;
-                stop = numIters >= params.num_iterations;
-            }else if(params.stop_type == params.STOP_FMCALLS)
-            {
-                fmCallsCount+=params.rollout_depth;
-                stop = (fmCallsCount + params.rollout_depth) > params.num_fmcalls;
+            ElapsedCpuTimer iterationTimer =
+                    new ElapsedCpuTimer();
+
+            SafetyTreeNode selected =
+                    treePolicy(state);
+
+            double result =
+                    selected.rollOut(state);
+
+            backUp(selected, result);
+
+            if (params.stop_type
+                    == params.STOP_TIME) {
+
+                numberOfIterations++;
+
+                accumulatedTimeTaken +=
+                        iterationTimer.elapsedMillis();
+
+                averageTimeTaken =
+                        accumulatedTimeTaken
+                                / numberOfIterations;
+
+                remaining =
+                        elapsedTimer.remainingTimeMillis();
+
+                stop =
+                        remaining <= 2 * averageTimeTaken
+                                || remaining
+                                <= remainingLimit;
+
+            } else if (params.stop_type
+                    == params.STOP_ITERATIONS) {
+
+                numberOfIterations++;
+
+                stop =
+                        numberOfIterations
+                                >= params.num_iterations;
+
+            } else if (params.stop_type
+                    == params.STOP_FMCALLS) {
+
+                fmCallsCount += params.rollout_depth;
+
+                stop =
+                        fmCallsCount
+                                + params.rollout_depth
+                                > params.num_fmcalls;
             }
         }
-        //System.out.println(" ITERS " + numIters);
     }
 
-    private SafetyTreeNode treePolicy(GameState state) {
+    private SafetyTreeNode treePolicy(
+            GameState state
+    ) {
+        SafetyTreeNode current = this;
 
-        SafetyTreeNode cur = this;
+        while (!state.isTerminal()
+                && current.m_depth
+                < params.rollout_depth) {
 
-        while (!state.isTerminal() && cur.m_depth < params.rollout_depth)
-        {
-            if (cur.notFullyExpanded()) {
-                return cur.expand(state);
-
-            } else {
-                cur = cur.uct(state);
+            if (current.notFullyExpanded()) {
+                return current.expand(state);
             }
+
+            current = current.uct(state);
         }
 
-        return cur;
+        return current;
     }
-
 
     /**
      * Expands one previously unvisited action.
      *
-     * When safe expansion is enabled, unvisited actions with an immediately
-     * safe destination are preferred. If none appear safe, expansion falls
-     * back to any unvisited action so the tree search can continue.
+     * When safe expansion is enabled, unvisited actions with an
+     * immediately safe destination are preferred. If none appear safe,
+     * expansion falls back to any unvisited action.
      */
-    private SafetyTreeNode expand(GameState state)
-    {
-        int selectedAction = selectExpansionAction(state);
+    private SafetyTreeNode expand(
+            GameState state
+    ) {
+        int selectedAction =
+                selectExpansionAction(state);
 
-        roll(state, actions[selectedAction]);
-
-        SafetyTreeNode child = new SafetyTreeNode(
-                params,
-                this,
-                selectedAction,
-                this.m_rnd,
-                num_actions,
-                actions,
-                fmCallsCount,
-                rootStateHeuristic
+        roll(
+                state,
+                actions[selectedAction]
         );
+
+        SafetyTreeNode child =
+                new SafetyTreeNode(
+                        params,
+                        this,
+                        selectedAction,
+                        m_rnd,
+                        num_actions,
+                        actions,
+                        fmCallsCount,
+                        rootStateHeuristic
+                );
 
         children[selectedAction] = child;
 
@@ -171,15 +239,18 @@ public class SafetyTreeNode
     /**
      * Selects an unexpanded action for a new tree node.
      */
-    private int selectExpansionAction(GameState state)
-    {
+    private int selectExpansionAction(
+            GameState state
+    ) {
         ArrayList<Integer> allUnexpandedActions =
                 new ArrayList<>();
 
         ArrayList<Integer> safeUnexpandedActions =
                 new ArrayList<>();
 
-        Vector2d currentPosition = state.getPosition();
+        Vector2d currentPosition =
+                state.getPosition();
+
         DangerMap dangerMap = null;
 
         if (params.use_safe_expansion
@@ -189,8 +260,8 @@ public class SafetyTreeNode
 
         for (int actionIndex = 0;
              actionIndex < children.length;
-             actionIndex++)
-        {
+             actionIndex++) {
+
             if (children[actionIndex] != null) {
                 continue;
             }
@@ -205,7 +276,10 @@ public class SafetyTreeNode
                     currentPosition,
                     actions[actionIndex]
             )) {
-                safeUnexpandedActions.add(actionIndex);
+
+                safeUnexpandedActions.add(
+                        actionIndex
+                );
             }
         }
 
@@ -227,290 +301,355 @@ public class SafetyTreeNode
     }
 
     /**
-     * Randomly selects one action index from a non-empty list.
+     * Randomly selects one original action index from a non-empty list.
      */
     private int chooseRandomIndex(
             ArrayList<Integer> actionIndexes
-    )
-    {
+    ) {
         if (actionIndexes == null
                 || actionIndexes.isEmpty()) {
+
             throw new IllegalArgumentException(
                     "Action index list cannot be empty."
             );
         }
 
         int randomListIndex =
-                m_rnd.nextInt(actionIndexes.size());
+                m_rnd.nextInt(
+                        actionIndexes.size()
+                );
 
-        return actionIndexes.get(randomListIndex);
+        return actionIndexes.get(
+                randomListIndex
+        );
     }
 
-    private void roll(GameState gs, Types.ACTIONS act)
-    {
-        //Simple, all random first, then my position.
-        int nPlayers = 4;
-        Types.ACTIONS[] actionsAll = new Types.ACTIONS[4];
-        int playerId = gs.getPlayerId() - Types.TILETYPE.AGENT0.getKey();
+    /**
+     * Advances a simulated state using the controlled action and random
+     * actions for the other three players.
+     */
+    private void roll(
+            GameState gameState,
+            Types.ACTIONS controlledAction
+    ) {
+        int numberOfPlayers = 4;
 
-        for(int i = 0; i < nPlayers; ++i)
-        {
-            if(playerId == i)
-            {
-                actionsAll[i] = act;
-            }else {
-                int actionIdx = m_rnd.nextInt(gs.nActions());
-                actionsAll[i] = Types.ACTIONS.all().get(actionIdx);
+        Types.ACTIONS[] allActions =
+                new Types.ACTIONS[numberOfPlayers];
+
+        int controlledPlayerIndex =
+                gameState.getPlayerId()
+                        - Types.TILETYPE.AGENT0.getKey();
+
+        for (int playerIndex = 0;
+             playerIndex < numberOfPlayers;
+             playerIndex++) {
+
+            if (controlledPlayerIndex
+                    == playerIndex) {
+
+                allActions[playerIndex] =
+                        controlledAction;
+
+            } else {
+                int actionIndex =
+                        m_rnd.nextInt(
+                                gameState.nActions()
+                        );
+
+                allActions[playerIndex] =
+                        Types.ACTIONS.all()
+                                .get(actionIndex);
             }
         }
 
-        gs.next(actionsAll);
-
+        gameState.next(allActions);
     }
 
-    private SafetyTreeNode uct(GameState state) {
+    private SafetyTreeNode uct(
+            GameState state
+    ) {
         SafetyTreeNode selected = null;
-        double bestValue = -Double.MAX_VALUE;
-        for (SafetyTreeNode child : this.children)
-        {
-            double hvVal = child.totValue;
-            double childValue =  hvVal / (child.nVisits + params.epsilon);
+        double bestValue =
+                -Double.MAX_VALUE;
 
-            childValue = Utils.normalise(childValue, bounds[0], bounds[1]);
+        for (SafetyTreeNode child
+                : children) {
 
-            double uctValue = childValue +
-                    params.K * Math.sqrt(Math.log(this.nVisits + 1) / (child.nVisits + params.epsilon));
+            double heuristicValue =
+                    child.totValue;
 
-            uctValue = Utils.noise(uctValue, params.epsilon, this.m_rnd.nextDouble());     //break ties randomly
+            double childValue =
+                    heuristicValue
+                            / (
+                            child.nVisits
+                                    + params.epsilon
+                    );
 
-            // small sampleRandom numbers: break ties in unexpanded nodes
+            childValue =
+                    Utils.normalise(
+                            childValue,
+                            bounds[0],
+                            bounds[1]
+                    );
+
+            double uctValue =
+                    childValue
+                            + params.K
+                            * Math.sqrt(
+                            Math.log(
+                                    nVisits + 1
+                            )
+                                    / (
+                                    child.nVisits
+                                            + params.epsilon
+                            )
+                    );
+
+            uctValue =
+                    Utils.noise(
+                            uctValue,
+                            params.epsilon,
+                            m_rnd.nextDouble()
+                    );
+
             if (uctValue > bestValue) {
                 selected = child;
                 bestValue = uctValue;
             }
         }
-        if (selected == null)
-        {
-            throw new RuntimeException("Warning! returning null: " + bestValue + " : " + this.children.length + " " +
-                    + bounds[0] + " " + bounds[1]);
+
+        if (selected == null) {
+            throw new RuntimeException(
+                    "Warning! returning null: "
+                            + bestValue
+                            + " : "
+                            + children.length
+                            + " "
+                            + bounds[0]
+                            + " "
+                            + bounds[1]
+            );
         }
 
-        //Roll the state:
-        roll(state, actions[selected.childIdx]);
+        roll(
+                state,
+                actions[selected.childIdx]
+        );
 
         return selected;
     }
 
-    private double rollOut(GameState state)
-    {
-        int thisDepth = this.m_depth;
+    private double rollOut(
+            GameState state
+    ) {
+        int currentDepth = m_depth;
 
-        while (!finishRollout(state, thisDepth)) {
-            int action = selectRolloutAction(state);
-            roll(state, actions[action]);
-            thisDepth++;
+        while (!finishRollout(
+                state,
+                currentDepth
+        )) {
+            int actionIndex =
+                    selectRolloutAction(state);
+
+            roll(
+                    state,
+                    actions[actionIndex]
+            );
+
+            currentDepth++;
         }
 
-        return rootStateHeuristic.evaluateState(state);
-    }
-
-
-
-    @SuppressWarnings("RedundantIfStatement")
-    private boolean finishRollout(GameState rollerState, int depth)
-    {
-        if (depth >= params.rollout_depth)      //rollout end condition.
-            return true;
-
-        if (rollerState.isTerminal())               //end of game
-            return true;
-
-        return false;
-    }
-
-    private void backUp(SafetyTreeNode node, double result)
-    {
-        SafetyTreeNode n = node;
-        while(n != null)
-        {
-            n.nVisits++;
-            n.totValue += result;
-            if (result < n.bounds[0]) {
-                n.bounds[0] = result;
-            }
-            if (result > n.bounds[1]) {
-                n.bounds[1] = result;
-            }
-            n = n.parent;
-        }
-    }
-
-
-    int mostVisitedAction() {
-        int selected = -1;
-        double bestValue = -Double.MAX_VALUE;
-        boolean allEqual = true;
-        double first = -1;
-
-        for (int i=0; i<children.length; i++) {
-
-            if(children[i] != null)
-            {
-                if(first == -1)
-                    first = children[i].nVisits;
-                else if(first != children[i].nVisits)
-                {
-                    allEqual = false;
-                }
-
-                double childValue = children[i].nVisits;
-                childValue = Utils.noise(childValue, params.epsilon, this.m_rnd.nextDouble());     //break ties randomly
-                if (childValue > bestValue) {
-                    bestValue = childValue;
-                    selected = i;
-                }
-            }
-        }
-
-        if (selected == -1)
-        {
-            selected = 0;
-        }else if(allEqual)
-        {
-            //If all are equal, we opt to choose for the one with the best Q.
-            selected = bestAction();
-        }
-
-        return selected;
-    }
-
-    private int bestAction()
-    {
-        int selected = -1;
-        double bestValue = -Double.MAX_VALUE;
-
-        for (int i=0; i<children.length; i++) {
-
-            if(children[i] != null) {
-                double childValue = children[i].totValue / (children[i].nVisits + params.epsilon);
-                childValue = Utils.noise(childValue, params.epsilon, this.m_rnd.nextDouble());     //break ties randomly
-                if (childValue > bestValue) {
-                    bestValue = childValue;
-                    selected = i;
-                }
-            }
-        }
-
-        if (selected == -1)
-        {
-            System.out.println("Unexpected selection!");
-            selected = 0;
-        }
-
-        return selected;
-    }
-
-
-    private boolean notFullyExpanded() {
-        for (SafetyTreeNode tn : children) {
-            if (tn == null) {
-                return true;
-            }
-        }
-
-        return false;
+        return rootStateHeuristic
+                .evaluateState(state);
     }
 
     /**
      * Selects an action during an MCTS rollout.
      *
-     * When danger-aware rollouts are enabled, the method chooses randomly
-     * between actions whose immediate destination is not blocked, burning,
-     * or threatened by a bomb within the configured danger horizon.
+     * When danger-aware rollouts are enabled, the method samples from
+     * actions whose immediate destination is not blocked, burning or
+     * threatened within the configured danger horizon.
+     *
+     * When disabled, the framework-style rollout policy is used.
      */
-    private int selectRolloutAction(GameState state)
-    {
+    private int selectRolloutAction(
+            GameState state
+    ) {
         if (!params.use_safe_rollouts) {
-            return m_rnd.nextInt(num_actions);
+            return selectOriginalRolloutAction(
+                    state
+            );
         }
 
-        Vector2d currentPosition = state.getPosition();
+        Vector2d currentPosition =
+                state.getPosition();
 
         if (currentPosition == null) {
-            return m_rnd.nextInt(num_actions);
+            return m_rnd.nextInt(
+                    num_actions
+            );
         }
 
-        DangerMap dangerMap = new DangerMap(state);
-        ArrayList<Integer> safeActionIndexes = new ArrayList<>();
+        DangerMap dangerMap =
+                new DangerMap(state);
+
+        ArrayList<Integer> safeActionIndexes =
+                new ArrayList<>();
 
         for (int actionIndex = 0;
              actionIndex < num_actions;
-             actionIndex++)
-        {
-            Types.ACTIONS action = actions[actionIndex];
+             actionIndex++) {
 
             if (isSafeDestination(
                     state,
                     dangerMap,
                     currentPosition,
-                    action
+                    actions[actionIndex]
             )) {
-                safeActionIndexes.add(actionIndex);
+                safeActionIndexes.add(
+                        actionIndex
+                );
             }
         }
 
-        /*
-         * When every action appears dangerous, retain exploration by
-         * returning a random action instead of stopping the rollout.
-         */
         if (safeActionIndexes.isEmpty()) {
-            return m_rnd.nextInt(num_actions);
+            return selectOriginalRolloutAction(
+                    state
+            );
         }
 
-        return chooseRandomIndex(safeActionIndexes);
+        return chooseRandomIndex(
+                safeActionIndexes
+        );
     }
 
     /**
-     * Checks the immediate destination produced by an action.
+     * Implements the framework-style rollout policy while preserving
+     * original action indices after candidates are removed.
      *
-     * This is a lightweight safety filter rather than a complete survival
-     * proof. Longer-term escape-route analysis will be added separately.
+     * The policy rejects only destinations containing active flames.
+     */
+    private int selectOriginalRolloutAction(
+            GameState state
+    ) {
+        Types.TILETYPE[][] board =
+                state.getBoard();
+
+        Vector2d position =
+                state.getPosition();
+
+        if (position == null) {
+            return m_rnd.nextInt(
+                    num_actions
+            );
+        }
+
+        ArrayList<Integer> remainingActions =
+                new ArrayList<>();
+
+        for (int actionIndex = 0;
+             actionIndex < num_actions;
+             actionIndex++) {
+
+            remainingActions.add(
+                    actionIndex
+            );
+        }
+
+        while (!remainingActions.isEmpty()) {
+            int listIndex =
+                    m_rnd.nextInt(
+                            remainingActions.size()
+                    );
+
+            int actionIndex =
+                    remainingActions.remove(
+                            listIndex
+                    );
+
+            Types.ACTIONS action =
+                    actions[actionIndex];
+
+            Vector2d direction =
+                    action.getDirection().toVec();
+
+            int destinationX =
+                    position.x + direction.x;
+
+            int destinationY =
+                    position.y + direction.y;
+
+            if (destinationY >= 0
+                    && destinationY < board.length
+                    && destinationX >= 0
+                    && destinationX
+                    < board[0].length
+                    && board[destinationY][destinationX]
+                    != Types.TILETYPE.FLAMES) {
+
+                return actionIndex;
+            }
+        }
+
+        return m_rnd.nextInt(
+                num_actions
+        );
+    }
+
+    /**
+     * Checks whether an action has an immediately acceptable destination.
+     *
+     * This is a short-horizon safety filter rather than a complete proof
+     * that the action survives every possible future sequence.
      */
     private boolean isSafeDestination(
             GameState state,
             DangerMap dangerMap,
             Vector2d currentPosition,
             Types.ACTIONS action
-    )
-    {
-        if (action == Types.ACTIONS.ACTION_BOMB) {
+    ) {
+        if (dangerMap == null
+                || currentPosition == null
+                || action == null) {
+            return false;
+        }
+
+        if (action
+                == Types.ACTIONS.ACTION_BOMB) {
+
             if (state.getAmmo() <= 0) {
                 return false;
             }
 
             if (params.use_escape_check
-                    && !EscapeRouteChecker.hasEscapeRoute(state)) {
+                    && !EscapeRouteChecker
+                    .hasEscapeRoute(state)) {
+
                 return false;
             }
 
             /*
-             * Placing a bomb does not move the agent immediately, so also
-             * ensure the current cell is not already in urgent danger.
+             * Bomb placement does not move the agent immediately.
              */
-            return !dangerMap.isDangerousWithin(
-                    currentPosition.x,
-                    currentPosition.y,
-                    params.danger_horizon
-            );
+            return !dangerMap
+                    .isDangerousWithin(
+                            currentPosition.x,
+                            currentPosition.y,
+                            params.danger_horizon
+                    );
         }
 
-        Vector2d direction = action.getDirection().toVec();
+        Vector2d direction =
+                action.getDirection().toVec();
 
         int destinationX =
-                currentPosition.x + direction.x;
+                currentPosition.x
+                        + direction.x;
 
         int destinationY =
-                currentPosition.y + direction.y;
+                currentPosition.y
+                        + direction.y;
 
         if (!dangerMap.isInsideBoard(
                 destinationX,
@@ -519,14 +658,23 @@ public class SafetyTreeNode
             return false;
         }
 
-        Types.TILETYPE[][] board = state.getBoard();
+        Types.TILETYPE[][] board =
+                state.getBoard();
+
         Types.TILETYPE destinationTile =
                 board[destinationY][destinationX];
 
-        if (destinationTile == Types.TILETYPE.RIGID
-                || destinationTile == Types.TILETYPE.WOOD
-                || destinationTile == Types.TILETYPE.BOMB
-                || destinationTile == Types.TILETYPE.FLAMES) {
+        if (destinationTile
+                == Types.TILETYPE.RIGID
+                || destinationTile
+                == Types.TILETYPE.WOOD
+                || destinationTile
+                == Types.TILETYPE.BOMB
+                || destinationTile
+                == Types.TILETYPE.FLAMES
+                || destinationTile
+                == Types.TILETYPE.FOG) {
+
             return false;
         }
 
@@ -535,5 +683,159 @@ public class SafetyTreeNode
                 destinationY,
                 params.danger_horizon
         );
+    }
+
+    @SuppressWarnings("RedundantIfStatement")
+    private boolean finishRollout(
+            GameState rolloutState,
+            int depth
+    ) {
+        if (depth >= params.rollout_depth) {
+            return true;
+        }
+
+        if (rolloutState.isTerminal()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private void backUp(
+            SafetyTreeNode node,
+            double result
+    ) {
+        SafetyTreeNode current = node;
+
+        while (current != null) {
+            current.nVisits++;
+            current.totValue += result;
+
+            if (result < current.bounds[0]) {
+                current.bounds[0] = result;
+            }
+
+            if (result > current.bounds[1]) {
+                current.bounds[1] = result;
+            }
+
+            current = current.parent;
+        }
+    }
+
+    int mostVisitedAction() {
+        int selected = -1;
+
+        double bestValue =
+                -Double.MAX_VALUE;
+
+        boolean allEqual = true;
+        double firstVisitCount = -1;
+
+        for (int actionIndex = 0;
+             actionIndex < children.length;
+             actionIndex++) {
+
+            SafetyTreeNode child =
+                    children[actionIndex];
+
+            if (child == null) {
+                continue;
+            }
+
+            if (firstVisitCount == -1) {
+                firstVisitCount =
+                        child.nVisits;
+
+            } else if (firstVisitCount
+                    != child.nVisits) {
+
+                allEqual = false;
+            }
+
+            double childValue =
+                    child.nVisits;
+
+            childValue =
+                    Utils.noise(
+                            childValue,
+                            params.epsilon,
+                            m_rnd.nextDouble()
+                    );
+
+            if (childValue > bestValue) {
+                bestValue = childValue;
+                selected = actionIndex;
+            }
+        }
+
+        if (selected == -1) {
+            selected = 0;
+
+        } else if (allEqual) {
+            selected = bestAction();
+        }
+
+        return selected;
+    }
+
+    private int bestAction() {
+        int selected = -1;
+
+        double bestValue =
+                -Double.MAX_VALUE;
+
+        for (int actionIndex = 0;
+             actionIndex < children.length;
+             actionIndex++) {
+
+            SafetyTreeNode child =
+                    children[actionIndex];
+
+            if (child == null) {
+                continue;
+            }
+
+            double childValue =
+                    child.totValue
+                            / (
+                            child.nVisits
+                                    + params.epsilon
+                    );
+
+            childValue =
+                    Utils.noise(
+                            childValue,
+                            params.epsilon,
+                            m_rnd.nextDouble()
+                    );
+
+            if (childValue > bestValue) {
+                bestValue = childValue;
+                selected = actionIndex;
+            }
+        }
+
+        if (selected == -1) {
+            System.out.println(
+                    "Unexpected selection!"
+            );
+
+            selected = 0;
+        }
+
+        return selected;
+    }
+
+    private boolean notFullyExpanded() {
+        for (SafetyTreeNode child
+                : children) {
+
+            if (child == null) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
