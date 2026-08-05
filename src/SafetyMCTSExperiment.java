@@ -55,7 +55,8 @@ public final class SafetyMCTSExperiment {
 
     static {
         VARIANTS.put(7, "baseline_copy");
-        VARIANTS.put(8, "safe_rollout");
+        // VARIANTS.put(8, "safe_rollout");
+        VARIANTS.put(10, "rollout_expansion");
         VARIANTS.put(11, "escape_aware");
         VARIANTS.put(6, "full");
     }

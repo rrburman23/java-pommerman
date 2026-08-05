@@ -30,7 +30,7 @@ public class MCTSParams implements ParameterSet {
 
     // Budget settings
     public int stop_type = STOP_TIME;
-    public int num_iterations = 200;
+    public int num_iterations = 100;
     public int num_fmcalls = 2000;
     public int num_time = 40;
 
